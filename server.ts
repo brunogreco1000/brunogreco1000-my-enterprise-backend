@@ -78,11 +78,13 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 (async () => {
   console.log('🔹 Inicializando server...');
   try {
-    console.log('🔹 Intentando conectar a MongoDB...');
-    await connectDB();
-  } catch (err) {
-    console.error('❌ MongoDB connection failed on startup', err);
-  }
+  console.log('🔹 Intentando conectar a MongoDB...');
+  await connectDB();
+  console.log('✅ MongoDB conectado correctamente');
+} catch (err) {
+  console.error('❌ Falló la conexión a MongoDB en Vercel:');
+  console.error(err); // imprime cualquier objeto de error
+}
 
   app.listen(process.env.PORT || 3000, () => {
     console.log('🚀 Server running...');
