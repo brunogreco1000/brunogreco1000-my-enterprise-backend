@@ -1,9 +1,23 @@
 {
   "version": 2,
   "builds": [
-    { "src": "backend/api.ts", "use": "@vercel/node" }
+    {
+      "src": "api/server.ts", 
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "routes/**/*", 
+          "middleware/**/*",
+          "config/**/*",
+          ".env" 
+        ]
+      }
+    }
   ],
   "routes": [
-    { "src": "/api/(.*)", "dest": "backend/api.ts" }
+    { 
+      "src": "/api/(.*)", 
+      "dest": "/api/server.ts" 
+    }
   ]
 }
