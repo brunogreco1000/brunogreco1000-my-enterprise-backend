@@ -1,9 +1,5 @@
 // models/User.ts
-import mongoose, { Schema, Document, Types, Model } from 'mongoose';
-
-interface UserModel extends Model<IUser> {
-  findByEmailWithPassword(email: string): Promise<IUser | null>;
-}
+import mongoose, { Schema, Document, Model, Types } from 'mongoose';
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
@@ -12,6 +8,10 @@ export interface IUser extends Document {
   password: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface UserModel extends Model<IUser> {
+  findByEmailWithPassword(email: string): Promise<IUser | null>;
 }
 
 const userSchema: Schema<IUser> = new Schema(
@@ -27,4 +27,5 @@ userSchema.statics.findByEmailWithPassword = function (email: string) {
   return this.findOne({ email }).select('+password');
 };
 
-export default mongoose.model<IUser, UserModel>('User', userSchema);
+const User = mongoose.model<IUser, UserModel>('User', userSchema);
+export default User;

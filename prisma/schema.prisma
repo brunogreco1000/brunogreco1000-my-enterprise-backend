@@ -1,0 +1,23 @@
+// prisma/schema.prisma
+
+// Generador de cliente Prisma
+generator client {
+  provider = "prisma-client-js"  // Asegúrate de usar "prisma-client-js"
+  output   = "../generated/prisma" // Ruta donde se generará el cliente
+}
+
+// Conexión a la base de datos Neon
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") // Prisma usará la URL de tu .env
+}
+
+// Modelo User
+model User {
+  id        String   @id @default(uuid())  // ID tipo UUID
+  username  String   @unique               // Nombre de usuario único
+  email     String   @unique               // Email único
+  password  String                          // Password encriptado
+  createdAt DateTime @default(now())       // Fecha de creación
+  updatedAt DateTime @updatedAt            // Fecha de actualización automática
+}

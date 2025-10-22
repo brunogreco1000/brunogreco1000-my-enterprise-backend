@@ -1,118 +1,97 @@
-// controllers/taskController.ts
-
 import { Response } from 'express';
-import mongoose, { Types } from 'mongoose'; // Necesario para Types.ObjectId
-import { AuthRequest } from '../middleware/authMiddleware'; 
-import Task from '../models/Task';
-import Project from '../models/Project'; 
-import { handleControllerError } from '../utils/errorHandler'; 
+import { AuthRequest } from '../middleware/authMiddleware';
+import prisma from '../db/client'; // Prisma client
+import { handleControllerError } from '../utils/errorHandler';
 
-// Función de utilidad para asegurar que el proyecto existe y pertenece al usuario
+// Función para verificar que el proyecto existe y pertenece al usuario
 const checkProjectOwnership = async (userId: string, projectId: string) => {
-    if (!Types.ObjectId.isValid(projectId)) return null;
-    
-    const project = await Project.findOne({ 
-        _id: projectId, 
-        userId: new Types.ObjectId(userId) // 🎯 FIX
-    });
-    return project;
+  return prisma.project.findFirst({
+    where: { id: projectId, userId }
+  });
 };
 
 // GET TASKS BY PROJECT ID
 export const getTasks = async (req: AuthRequest, res: Response) => {
-    if (!req.user || !req.user.id) return res.status(401).json({ message: 'Autenticación requerida.' });
-    
-    try {
-        const { projectId } = req.query;
+  if (!req.user?.id) return res.status(401).json({ message: 'Autenticación requerida.' });
 
-        // Seguridad: Verificar que el projectId existe y pertenece al usuario
-        const project = await checkProjectOwnership(req.user.id, projectId as string);
-        if (!project) {
-            return res.status(404).json({ message: 'Proyecto no encontrado o no autorizado.' });
-        }
+  try {
+    const projectId = req.query.projectId as string;
+    if (!projectId) return res.status(400).json({ message: 'projectId es obligatorio.' });
 
-        const tasks = await Task.find({ projectId: project._id }).lean();
-        res.json(tasks);
-        
-    } catch (err) {
-        handleControllerError(err, res);
-    }
+    const project = await checkProjectOwnership(req.user.id, projectId);
+    if (!project) return res.status(404).json({ message: 'Proyecto no encontrado o no autorizado.' });
+
+    const tasks = await prisma.task.findMany({
+      where: { projectId: project.id },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(tasks);
+  } catch (err) {
+    handleControllerError(err, res);
+  }
 };
 
 // CREATE TASK
 export const createTask = async (req: AuthRequest, res: Response) => {
-    if (!req.user || !req.user.id) return res.status(401).json({ message: 'Autenticación requerida.' });
+  if (!req.user?.id) return res.status(401).json({ message: 'Autenticación requerida.' });
 
-    try {
-        const { title, projectId } = req.body;
+  try {
+    const { title, projectId } = req.body;
+    if (!title || !projectId) return res.status(400).json({ message: 'Título y ProjectId son obligatorios.' });
 
-        if (!title || !projectId) {
-            return res.status(400).json({ message: 'Título y ProjectId son obligatorios.' });
-        }
+    const project = await checkProjectOwnership(req.user.id, projectId);
+    if (!project) return res.status(404).json({ message: 'Proyecto no encontrado o no autorizado.' });
 
-        // Seguridad: Verificar que el projectId existe y pertenece al usuario
-        const project = await checkProjectOwnership(req.user.id, projectId);
-        if (!project) {
-            return res.status(404).json({ message: 'Proyecto no encontrado o no autorizado.' });
-        }
-        
-        const task = await Task.create({ title, projectId: project._id });
-        res.status(201).json(task);
-        
-    } catch (err) {
-        handleControllerError(err, res);
-    }
+    const task = await prisma.task.create({
+      data: { title, projectId: project.id }
+    });
+
+    res.status(201).json(task);
+  } catch (err) {
+    handleControllerError(err, res);
+  }
 };
 
 // UPDATE TASK
 export const updateTask = async (req: AuthRequest, res: Response) => {
-    if (!req.user || !req.user.id) return res.status(401).json({ message: 'Autenticación requerida.' });
+  if (!req.user?.id) return res.status(401).json({ message: 'Autenticación requerida.' });
 
-    try {
-        const { id } = req.params;
-        
-        // 1. Verificar la pertenencia del proyecto asociado a la tarea
-        const taskToUpdate = await Task.findById(id);
-        if (!taskToUpdate) return res.status(404).json({ message: 'Tarea no encontrada.' });
-        
-        const ownerProject = await checkProjectOwnership(req.user.id, taskToUpdate.projectId.toString());
-        if (!ownerProject) {
-            return res.status(403).json({ message: 'No autorizado para modificar esta tarea.' });
-        }
+  try {
+    const { id } = req.params;
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) return res.status(404).json({ message: 'Tarea no encontrada.' });
 
-        // 2. Actualizar (incluyendo validación y devolviendo el nuevo objeto)
-        const updatedTask = await Task.findByIdAndUpdate(id, req.body, { new: true, runValidators: true });
-        
-        res.json(updatedTask);
-        
-    } catch (err) {
-        handleControllerError(err, res);
-    }
+    const project = await checkProjectOwnership(req.user.id, task.projectId);
+    if (!project) return res.status(403).json({ message: 'No autorizado para modificar esta tarea.' });
+
+    const updatedTask = await prisma.task.update({
+      where: { id },
+      data: req.body
+    });
+
+    res.json(updatedTask);
+  } catch (err) {
+    handleControllerError(err, res);
+  }
 };
 
 // DELETE TASK
 export const deleteTask = async (req: AuthRequest, res: Response) => {
-    if (!req.user || !req.user.id) return res.status(401).json({ message: 'Autenticación requerida.' });
+  if (!req.user?.id) return res.status(401).json({ message: 'Autenticación requerida.' });
 
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
+    const task = await prisma.task.findUnique({ where: { id } });
+    if (!task) return res.status(404).json({ message: 'Tarea no encontrada.' });
 
-        // 1. Buscar la tarea para obtener su projectId
-        const taskToDelete = await Task.findById(id);
-        if (!taskToDelete) return res.status(404).json({ message: 'Tarea no encontrada.' });
+    const project = await checkProjectOwnership(req.user.id, task.projectId);
+    if (!project) return res.status(403).json({ message: 'No autorizado para eliminar esta tarea.' });
 
-        // 2. Seguridad: Verificar la pertenencia del proyecto
-        const ownerProject = await checkProjectOwnership(req.user.id, taskToDelete.projectId.toString());
-        if (!ownerProject) {
-            return res.status(403).json({ message: 'No autorizado para eliminar esta tarea.' });
-        }
+    await prisma.task.delete({ where: { id } });
 
-        // 3. Eliminar la tarea
-        await Task.deleteOne({ _id: id });
-
-        res.json({ message: 'Tarea eliminada correctamente.' });
-        
-    } catch (err) {
-        handleControllerError(err, res);
-    }
+    res.json({ message: 'Tarea eliminada correctamente.' });
+  } catch (err) {
+    handleControllerError(err, res);
+  }
 };
