@@ -1,6 +1,6 @@
 // server.ts
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config(); // Carga las variables de entorno desde .env
 
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
@@ -41,8 +41,11 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// Debug endpoint opcional
+// Debug endpoint para revisar variables de entorno
 app.get('/api/debug', (req: Request, res: Response) => {
+  // Aquí vemos si Vercel realmente tiene acceso a MONGO_URI
+  console.log('🔹 DEBUG MONGO_URI:', process.env.MONGO_URI);
+
   res.json({
     dbStatus: getDbStatus(),
     env: {
@@ -77,14 +80,20 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // --- Inicializar DB y servidor ---
 (async () => {
   console.log('🔹 Inicializando server...');
+
+  // DEBUG adicional para ver si la variable de entorno existe
+  if (!process.env.MONGO_URI) {
+    console.error('❌ MONGO_URI no está definido en Vercel!');
+  }
+
   try {
-  console.log('🔹 Intentando conectar a MongoDB...');
-  await connectDB();
-  console.log('✅ MongoDB conectado correctamente');
-} catch (err) {
-  console.error('❌ Falló la conexión a MongoDB en Vercel:');
-  console.error(err); // imprime cualquier objeto de error
-}
+    console.log('🔹 Intentando conectar a MongoDB...');
+    await connectDB();
+    console.log('✅ MongoDB conectado correctamente');
+  } catch (err) {
+    console.error('❌ Falló la conexión a MongoDB en Vercel:');
+    console.error(err); // imprime cualquier objeto de error
+  }
 
   app.listen(process.env.PORT || 3000, () => {
     console.log('🚀 Server running...');
