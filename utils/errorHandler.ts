@@ -1,37 +1,23 @@
-// utils/errorHandler.ts
-
 import { Response } from 'express';
-import mongoose from 'mongoose';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
-export const handleControllerError = (err: any, res: Response) => {
-    console.error('SERVER ERROR:', err);
+export const handleControllerError = (err: unknown, res: Response) => {
+  console.error('SERVER ERROR:', err);
 
-    // Mongoose Validation Error (400)
-    if (err instanceof mongoose.Error.ValidationError) {
-        const messages = Object.values(err.errors).map((e: any) => e.message);
-        return res.status(400).json({ 
-            message: 'Falló la validación de datos.', 
-            errors: messages 
-        });
+  // Known Prisma error
+  if (err instanceof PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case 'P2002':
+        const field = (err.meta?.target as string[]).join(', ');
+        return res.status(409).json({ message: `El campo ${field} ya existe y debe ser único.` });
+      case 'P2003':
+        return res.status(400).json({ message: 'Referencia a otro recurso no válida.' });
+      default:
+        return res.status(400).json({ message: 'Error de restricción en la base de datos.' });
     }
+  }
 
-    // Mongoose Cast Error (400 - ID inválido)
-    if (err instanceof mongoose.Error.CastError) {
-        return res.status(400).json({ 
-            message: `Formato de ID inválido en el campo ${err.path}.` 
-        });
-    }
-
-    // Error de Duplicidad (409)
-    if (err.code && err.code === 11000) {
-        const field = Object.keys(err.keyValue).join(', ');
-        return res.status(409).json({ 
-            message: `El campo ${field} ya existe y debe ser único.` 
-        });
-    }
-
-    // Otros errores internos (500)
-    res.status(500).json({ 
-        message: 'Error interno del servidor.' 
-    });
+  // Otros errores
+  return res.status(500).json({ message: 'Error interno del servidor.' });
 };
+

@@ -3,15 +3,18 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
+import projectRoutes from './routes/projectRoutes';
+import taskRoutes from './routes/taskRoutes';
 import prisma from './db/client'; // Prisma client
 
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middlewares
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*', // Cambia por tu dominio de React PWA
+  origin: process.env.FRONTEND_URL || '*',
   credentials: true
 }));
 app.use(cookieParser());
@@ -19,36 +22,49 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
-// Error handling middleware
+// Global error handling middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ message: 'Internal server error' });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, async () => {
+// Start server and connect to Neon
+(async () => {
   try {
-    await prisma.$connect(); // Conecta Prisma/Neon
-    console.log(`Server running on port ${PORT}`);
+    await prisma.$connect();
+    console.log('Database connected successfully.');
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   } catch (err) {
     console.error('Database connection failed:', err);
+    process.exit(1);
   }
-});
+})();
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+const shutdown = async () => {
+  console.log('Shutting down server...');
   await prisma.$disconnect();
   process.exit(0);
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+process.on('uncaughtException', async (err) => {
+  console.error('Uncaught Exception:', err);
+  await shutdown();
 });
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+process.on('unhandledRejection', async (reason) => {
+  console.error('Unhandled Rejection:', reason);
+  await shutdown();
 });

@@ -2,7 +2,7 @@
 
 // Generador de cliente Prisma
 generator client {
-  provider = "prisma-client-js"  // Asegúrate de usar "prisma-client-js"
+  provider = "prisma-client-js"
   output   = "../generated/prisma" // Ruta donde se generará el cliente
 }
 
@@ -14,10 +14,51 @@ datasource db {
 
 // Modelo User
 model User {
-  id        String   @id @default(uuid())  // ID tipo UUID
-  username  String   @unique               // Nombre de usuario único
-  email     String   @unique               // Email único
-  password  String                          // Password encriptado
-  createdAt DateTime @default(now())       // Fecha de creación
-  updatedAt DateTime @updatedAt            // Fecha de actualización automática
+  id        String    @id @default(uuid())   // ID tipo UUID
+  username  String    @unique                // Nombre de usuario único
+  email     String    @unique                // Email único
+  password  String                             // Password encriptado
+  projects  Project[]                          // Relación con proyectos
+  createdAt DateTime @default(now())          // Fecha de creación
+  updatedAt DateTime @updatedAt               // Fecha de actualización automática
+}
+
+// Modelo Project
+model Project {
+  id        String        @id @default(uuid())    // UUID
+  name      String                                // Nombre del proyecto
+  status    ProjectStatus @default(PENDING)      // Enum status
+  dueDate   DateTime                               // Fecha de vencimiento
+  progress  Int           @default(0)             // Progreso (0-100)
+  userId    String                                // Relación al usuario
+  user      User          @relation(fields: [userId], references: [id])
+  tasks     Task[]                                // Relación con tareas
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+// Modelo Task
+model Task {
+  id        String      @id @default(uuid())      // UUID
+  title     String                               // Título de la tarea
+  status    TaskStatus @default(PENDING)         // Enum status
+  projectId String                               // Relación al proyecto
+  project   Project @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Enums para status
+enum ProjectStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
 }
