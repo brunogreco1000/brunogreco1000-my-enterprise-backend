@@ -1,36 +1,30 @@
 import mongoose from 'mongoose';
 
-let cached = (global as any).mongoose;
-if (!cached) cached = (global as any).mongoose = { conn: null, promise: null };
-let isDbConnected = false;
+let dbStatus = 'Not connected';
+
+export const getDbStatus = () => dbStatus;
 
 const connectDB = async () => {
-  if (cached.conn) return cached.conn;
   if (!process.env.MONGO_URI) {
-    console.error('❌ MONGO_URI no definido!');
-    return null;
+    dbStatus = 'Failed';
+    throw new Error('MONGO_URI is not defined in environment variables');
   }
 
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(process.env.MONGO_URI!, {
-      serverSelectionTimeoutMS: 5000, // 5s timeout
-    })
-    .then(m => {
-      isDbConnected = true;
-      console.log(`✅ MongoDB Connected: ${m.connection.host}`);
-      return m;
-    })
-    .catch(err => {
-      isDbConnected = false;
-      console.error('❌ MongoDB connection error (Vercel):');
-      console.error(err);
-      throw err;
+  try {
+    console.log('🔹 Conectando a MongoDB con URI:', process.env.MONGO_URI.substring(0, 40) + '...');
+    await mongoose.connect(process.env.MONGO_URI, {
+      autoIndex: true,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000, // 5 segundos
+      socketTimeoutMS: 45000, // 45 segundos
     });
+    dbStatus = 'Connected';
+    console.log('✅ MongoDB conectado correctamente');
+  } catch (err) {
+    dbStatus = 'Failed';
+    console.error('❌ Error conectando a MongoDB:', err);
+    throw err;
   }
-
-  cached.conn = await cached.promise;
-  return cached.conn;
 };
 
-export const getDbStatus = (): 'Connected' | 'Failed' => isDbConnected ? 'Connected' : 'Failed';
 export default connectDB;

@@ -1,6 +1,5 @@
-// server.ts
 import dotenv from 'dotenv';
-dotenv.config(); // Carga las variables de entorno desde .env
+dotenv.config();
 
 import express, { Request, Response, NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
@@ -15,7 +14,7 @@ const app = express();
 // --- Configuración CORS ---
 const corsOptions: CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // Postman o server-to-server
+    if (!origin) return callback(null, true);
     const allowedOrigins = [
       'https://my-enterprise-app-plum.vercel.app',
       'https://my-enterprise-app-brunogreco1000-6932-bruno-grecos-projects.vercel.app',
@@ -41,11 +40,8 @@ app.get('/', (req: Request, res: Response) => {
   });
 });
 
-// Debug endpoint para revisar variables de entorno
+// Debug endpoint
 app.get('/api/debug', (req: Request, res: Response) => {
-  // Aquí vemos si Vercel realmente tiene acceso a MONGO_URI
-  console.log('🔹 DEBUG MONGO_URI:', process.env.MONGO_URI);
-
   res.json({
     dbStatus: getDbStatus(),
     env: {
@@ -63,7 +59,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 
 // --- 404 handler ---
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response) => {
   res.status(404).json({ message: `Route not found - ${req.originalUrl}` });
 });
 
@@ -80,19 +76,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // --- Inicializar DB y servidor ---
 (async () => {
   console.log('🔹 Inicializando server...');
-
-  // DEBUG adicional para ver si la variable de entorno existe
-  if (!process.env.MONGO_URI) {
-    console.error('❌ MONGO_URI no está definido en Vercel!');
-  }
-
   try {
-    console.log('🔹 Intentando conectar a MongoDB...');
     await connectDB();
-    console.log('✅ MongoDB conectado correctamente');
   } catch (err) {
-    console.error('❌ Falló la conexión a MongoDB en Vercel:');
-    console.error(err); // imprime cualquier objeto de error
+    console.error('❌ MongoDB connection failed on startup');
   }
 
   app.listen(process.env.PORT || 3000, () => {
